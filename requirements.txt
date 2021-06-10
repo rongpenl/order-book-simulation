@@ -1,9 +1,11 @@
+aiostream==0.4.3
 altair==4.1.0
 appnope==0.1.2
 argon2-cffi==20.1.0
 astor==0.8.1
 async-generator==1.10
 attrs==21.2.0
+autopep8==1.5.7
 backcall==0.2.0
 base58==2.1.0
 bleach==3.3.0
@@ -52,6 +54,7 @@ prompt-toolkit==3.0.18
 protobuf==3.17.3
 ptyprocess==0.7.0
 pyarrow==4.0.1
+pycodestyle==2.7.0
 pycparser==2.20
 pydeck==0.6.2
 Pygments==2.9.0
