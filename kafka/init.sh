@@ -10,6 +10,11 @@
 
 # Another way is to use Homebrew on Mac with `brew services start kafka` or `brew services stop kafka`.
 
+# If topics exist, delete them first
+kafka-topics --bootstrap-server localhost:9092 --delete --topic incoming-order
+kafka-topics --bootstrap-server localhost:9092 --delete --topic fulfill-notification
+kafka-topics --bootstrap-server localhost:9092 --delete --topic current-price
+
 # Step 2, create 3 topics whose names are
 # 1, incoming-order
 # 2, fulfill-notification
