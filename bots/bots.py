@@ -16,13 +16,13 @@ class Bot:
                  kafka_consumer_config: dict = {
                      "bootstrap_servers": 'localhost:9092',
                      "value_deserializer": lambda v: json.loads(
-                         v).decode('utf-8'),
+                         v.decode("utf-8")),
     },
             order_topic: str = "incoming-order",
             notification_topic: str = "fulfill-notification",
             price_topic: str = "current-price"):
 
-        self.producer = None
+        self.order_producer = None
         self.broadcast_consumer = None
         self.notification_consumer = None
         self.kafka_consumer_config = kafka_consumer_config
@@ -38,6 +38,11 @@ class Bot:
 
 
 class NaiveBot(Bot):
+    
+    def __init__(self, limit_only: bool = False, time_offset: float = 1):
+        super(NaiveBot, self).__init__()
+        self.limit_only = limit_only
+        self.time_offset = time_offset
 
     def run(self):
         """
@@ -62,42 +67,43 @@ class NaiveBot(Bot):
         loop.run_forever()
 
     async def submit_order(self):
-        self.producer = KafkaProducer(**self.kafka_prod_config)
+        self.order_producer = KafkaProducer(**self.kafka_prod_config)
         while True:
             order_size = random.randint(10, 100)
             order_timestamp = int(time.time()*6)
             order_id = id(self) + id(order_timestamp)
 
-            order_price = random.normalvariate(
-                mu=self.data["current_price"], sigma=5)
+            order_price = round(random.normalvariate(
+                mu=self.data["current_price"], sigma=5),2)
             if abs(order_price - self.data["current_price"]) > 2.5:
                 order_direction = "buy" if order_price - \
                     self.data["current_price"] < 0 else "sell"
                 order_type = "limit"
             else:
                 order_direction = "buy" if random.random() > 0.5 else "sell"
-                order_type = "limit" if random.random() > 0.5 else "market"
+                order_type = "limit" if (self.limit_only or random.random() > 0.5) else "market"
 
             order_struct = {
                 "order_id": order_id,
                 "order_type": order_type,
                 "order_size": order_size,
-                "order_price": order_price,
+                "order_price": order_price if order_type == "limit" else None,
                 "order_direction": order_direction,
                 "submit_timestamp": order_timestamp,
             }
-            self.producer.send(topic=self.order_topic, value=order_struct)
-            self.producer.flush()
-            await asyncio.sleep(random.random()*5)
+            self.order_producer.send(topic=self.order_topic, value=order_struct)
+            self.order_producer.flush()
+            await asyncio.sleep(random.random() + self.time_offset)
 
     async def obtain_notification(self):
         self.notification_consumer = AIOKafkaConsumer(self.notification_topic,
                                                    **self.kafka_consumer_config)
         await self.notification_consumer.start()
         try:
-            async for notification in self.notification_consumer:
-                print(notification)
-                await asyncio.sleep(0.05)
+            async for msg in self.notification_consumer:
+                notification = msg.value
+                print("fulfill notification: {}".format(notification), "\n")
+                await asyncio.sleep(0.01)
         finally:
             await self.notification_consumer.stop()
 
@@ -106,14 +112,15 @@ class NaiveBot(Bot):
                                                 **self.kafka_consumer_config)
         await self.broadcast_consumer.start()
         try:
-            async for info in self.broadcast_consumer:
-                print(info)
-                self.data["current_price"] = info["fill_price"]
-                print("boradcasting price: {}".format(
-                    self.data["current_price"]))
+            async for msg in self.broadcast_consumer:
+                feed = msg.value
+                if feed.get("level_2", {}) == {}:
+                    print("price broadcast : {}".format(feed), "\n")
+                self.data["current_price"] = feed.get("fill_price", 100)
                 await asyncio.sleep(0.01)
         finally:
-            self.broadcast_consumer.stop()
+            await self.broadcast_consumer.stop()
 
 
-NaiveBot().run()
+if __name__ == "__main__":
+    NaiveBot(limit_only=True, time_offset= 1).run()

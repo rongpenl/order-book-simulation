@@ -1,6 +1,6 @@
 {
     "order":{
-        "bot_id":"string",
+        "order_id":"string",
         "order_type":"string",
         "order_size":"int",
         "order_price":"float",
@@ -8,18 +8,18 @@
         "submit_timestamp":"int"
     },
     "notification":{
-        "bot_id": "string",
+        "order_id": "string",
         "fill_price":"float",
         "fill_size":"int",
         "partial_fill":"bool",
         "received_timestamp":"int",
-        "fill_timestamp":"int",
-        "unfilled_order":"bool"
+        "fill_timestamp":"int"
     },
-    "broadcast":{
+    "feed":{
         "exchange_id":"",
         "fill_price": "float",
         "fill_size":"int",
-        "fill_timestamp":"int"
+        "fill_timestamp":"int",
+        "level_2":"struct"
     }
 }
