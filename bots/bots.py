@@ -7,6 +7,7 @@ import json
 import asyncio
 import time
 
+random.seed(1)
 
 class Bot:
     def __init__(self, kafka_prod_config: dict = {"bootstrap_servers": 'localhost:9092',
@@ -68,20 +69,23 @@ class NaiveBot(Bot):
 
     async def submit_order(self):
         self.order_producer = KafkaProducer(**self.kafka_prod_config)
+        i, BURNIN = 0, 100
         while True:
+            i += 1 # first 100 orders must be limit order
             order_size = random.randint(10, 100)
             order_timestamp = int(time.time()*6)
             order_id = id(self) + id(order_timestamp)
 
-            order_price = round(random.normalvariate(
-                mu=self.data["current_price"], sigma=5),2)
+            order_price = int(random.normalvariate(
+                mu=self.data["current_price"], sigma=5))
             if abs(order_price - self.data["current_price"]) > 2.5:
                 order_direction = "buy" if order_price - \
                     self.data["current_price"] < 0 else "sell"
                 order_type = "limit"
             else:
                 order_direction = "buy" if random.random() > 0.5 else "sell"
-                order_type = "limit" if (self.limit_only or random.random() > 0.5) else "market"
+                order_type = "limit" if (i < BURNIN or self.limit_only or random.random() > 0.5) else "market"
+                order_size = int(order_size * 0.5) # mimic small order around current price
 
             order_struct = {
                 "order_id": order_id,
@@ -93,7 +97,7 @@ class NaiveBot(Bot):
             }
             self.order_producer.send(topic=self.order_topic, value=order_struct)
             self.order_producer.flush()
-            await asyncio.sleep(random.random() + self.time_offset)
+            await asyncio.sleep(self.time_offset)
 
     async def obtain_notification(self):
         self.notification_consumer = AIOKafkaConsumer(self.notification_topic,
@@ -102,8 +106,8 @@ class NaiveBot(Bot):
         try:
             async for msg in self.notification_consumer:
                 notification = msg.value
-                print("fulfill notification: {}".format(notification), "\n")
-                await asyncio.sleep(0.01)
+                # print("fulfill notification: {}".format(notification), "\n")
+                await asyncio.sleep(0)
         finally:
             await self.notification_consumer.stop()
 
@@ -114,13 +118,14 @@ class NaiveBot(Bot):
         try:
             async for msg in self.broadcast_consumer:
                 feed = msg.value
-                if feed.get("level_2", {}) == {}:
-                    print("price broadcast : {}".format(feed), "\n")
+                # if feed.get("level_2", {}) == {}:
+                #     print("price broadcast : {}".format(feed), "\n")
                 self.data["current_price"] = feed.get("fill_price", 100)
-                await asyncio.sleep(0.01)
+                print(self.data["current_price"])
+                await asyncio.sleep(0)
         finally:
             await self.broadcast_consumer.stop()
 
 
 if __name__ == "__main__":
-    NaiveBot(limit_only=True, time_offset= 1).run()
+    NaiveBot(limit_only=False, time_offset= 0.01).run()
