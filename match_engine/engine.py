@@ -180,9 +180,12 @@ class Engine:
                 self.broadcast_price(feed=feed)
                 
             # broadcast the order depth information after orders at a certain price
+        try:
             feed["level_2"] = copy.deepcopy(self.data["orderbook"])
             self.broadcast_price(feed=feed)
             self.data["latest_feed"] = feed
+        except:
+            pass
         self.clean_limit_orderbook(post = True)
                 
 
@@ -206,6 +209,7 @@ class Engine:
             
         if post:
             if np.inf in orderbook.keys() or -np.inf in orderbook.keys():
+                # debugging
                 pprint(self.data["orderbook"]["buy"][sorted(self.data["orderbook"]["buy"].keys())[-1]])
                 pprint(self.data["orderbook"]["sell"][sorted(self.data["orderbook"]["sell"].keys())[0]])
                 self.print_orderbook()
